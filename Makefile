@@ -145,9 +145,10 @@ UPROGS=\
 	$U/_logstress\
 	$U/_forphan\
 	$U/_dorphan\
+	$U/_EAFITos\
 
-fs.img: mkfs/mkfs README $(UPROGS)
-	mkfs/mkfs fs.img README $(UPROGS)
+fs.img: mkfs/mkfs README user/EAFITos.txt $(UPROGS)
+	mkfs/mkfs fs.img README user/EAFITos.txt $(UPROGS)
 
 -include kernel/*.d user/*.d
 
