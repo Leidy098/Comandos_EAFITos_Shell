@@ -23,6 +23,12 @@ sys_getpid(void)
 }
 
 uint64
+sys_hello(void)
+{
+  return 42;
+}
+
+uint64
 sys_fork(void)
 {
   return kfork();
