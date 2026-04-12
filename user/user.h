@@ -25,6 +25,7 @@ int hello(void);
 char* sys_sbrk(int,int);
 int pause(int);
 int uptime(void);
+int dumpvm(void);
 
 // ulib.c
 int stat(const char*, struct stat*);

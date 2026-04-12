@@ -484,7 +484,17 @@ ismapped(pagetable_t pagetable, uint64 va)
   }
   return 0;
 }
-// Imprime recursivamente la tabla de páginas con indentación por nivel.
+static void
+vmprint_flags(pte_t pte)
+{
+  printf("%c", (pte & PTE_V) ? 'V' : '-');
+  printf("%c", (pte & PTE_R) ? 'R' : '-');
+  printf("%c", (pte & PTE_W) ? 'W' : '-');
+  printf("%c", (pte & PTE_X) ? 'X' : '-');
+  printf("%c", (pte & PTE_U) ? 'U' : '-');
+}
+
+// Imprime recursivamente la tabla de paginas con indentacion por nivel.
 static void
 vmprint_level(pagetable_t pagetable, int level)
 {
@@ -493,21 +503,18 @@ vmprint_level(pagetable_t pagetable, int level)
     if ((pte & PTE_V) == 0)
       continue;
     uint64 pa = PTE2PA(pte);
-    // Indentación según nivel
+
     for (int j = 0; j < level; j++)
       printf(" ..");
-    printf("%d: pte=%p pa=%p ", i, (void *)pte, (void *)pa);
-    // Imprime banderas legibles
-    printf("[");
-    if (pte & PTE_R) printf("R");
-    if (pte & PTE_W) printf("W");
-    if (pte & PTE_X) printf("X");
-    if (pte & PTE_U) printf("U");
-    printf("]\n");
-    // Si no es hoja, recorre el siguiente nivel
+
+    printf("L%d[%d]: pte=%p pa=%p flags=", level - 1, i, (void *)pte, (void *)pa);
+    vmprint_flags(pte);
     if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+      printf(" branch\n");
       pagetable_t child = (pagetable_t)pa;
       vmprint_level(child, level + 1);
+    } else {
+      printf(" leaf\n");
     }
   }
 }

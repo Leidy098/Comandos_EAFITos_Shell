@@ -121,3 +121,13 @@ sys_trace(void)
     myproc()->trace_mask = mask;
     return 0;
 }
+
+uint64
+sys_dumpvm(void)
+{
+  struct proc *p = myproc();
+
+  printf("dumpvm: pid=%d name=%s sz=%p\n", p->pid, p->name, (void *)p->sz);
+  vmprint(p->pagetable);
+  return 0;
+}
