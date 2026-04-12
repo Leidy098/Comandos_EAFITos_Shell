@@ -53,9 +53,8 @@ usertrap(void)
   
   if(r_scause() == 8){
     // system call
-    printf("usertrap: ecall sepc=0x%lx syscall=%ld\n",
-           p->trapframe->epc, p->trapframe->a7);
-
+    // printf("usertrap: ecall sepc=0x%lx syscall=%ld\n",
+    //        p->trapframe->epc, p->trapframe->a7);
     if(killed(p))
       kexit(-1);
 

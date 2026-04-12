@@ -147,7 +147,7 @@ UPROGS=\
 	$U/_forphan\
 	$U/_dorphan\
 	$U/_EAFITos\
-
+	$U/_ttrace
 fs.img: mkfs/mkfs README user/EAFITos.txt $(UPROGS)
 	mkfs/mkfs fs.img README user/EAFITos.txt $(UPROGS)
 

@@ -249,6 +249,6 @@ main(void)
     printf("Comando no reconocido. Escribe ayuda.\n");
   }
 
-  printf("Saliendo de EAFITos ...\n");
+  printf("Saliendo de EAFITos \n");
   exit(0);
 }
