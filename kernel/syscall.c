@@ -142,18 +142,21 @@ syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
- if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    // Imprime ANTES de ejecutar si el bit está activo
+  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    // Muestra los registros crudos justo antes de que el handler use arg*.
     if(p->trace_mask & (1 << num)){
-        printf("[strace] pid=%d name=%s syscall#=%d a0=%ld a1=%ld a2=%ld\n",
-               p->pid, p->name, num,
-               p->trapframe->a0,
-               p->trapframe->a1,
-               p->trapframe->a2);
+      printf("[strace] pid=%d name=%s syscall#=%d raw a0=%ld a1=%ld a2=%ld a3=%ld a4=%ld a5=%ld\n",
+             p->pid, p->name, num,
+             p->trapframe->a0,
+             p->trapframe->a1,
+             p->trapframe->a2,
+             p->trapframe->a3,
+             p->trapframe->a4,
+             p->trapframe->a5);
     }
     p->trapframe->a0 = syscalls[num]();
-} else {
+  } else {
     printf("%d %s: unknown sys call %d\n", p->pid, p->name, num);
     p->trapframe->a0 = -1;
-}
+  }
 }

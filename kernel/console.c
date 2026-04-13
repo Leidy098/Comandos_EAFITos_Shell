@@ -68,7 +68,7 @@ consolewrite(int user_src, uint64 src, int n)
     if(nn > n - i)
       nn = n - i;
     if(either_copyin(buf, user_src, src+i, nn) == -1)
-      break;
+      return -1;
     uartwrite(buf, nn);
     i += nn;
   }
@@ -116,7 +116,7 @@ consoleread(int user_dst, uint64 dst, int n)
     // copy the input byte to the user-space buffer.
     cbuf = c;
     if(either_copyout(user_dst, dst, &cbuf, 1) == -1)
-      break;
+      return -1;
 
     dst++;
     --n;
