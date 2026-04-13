@@ -131,3 +131,32 @@ sys_dumpvm(void)
   vmprint(p->pagetable);
   return 0;
 }
+uint64
+sys_map_ro(void)
+{
+  uint64 va;
+  argaddr(0, &va);
+
+  struct proc *p = myproc();
+
+  // Redondea a límite de página
+  va = PGROUNDDOWN(va);
+
+  // Mensaje que el kernel copia a la página
+  char *msg = "Pagina solo lectura desde kernel\n";
+
+  // Asigna página física
+  char *mem = kalloc();
+  if(mem == 0)
+    return -1;
+  memset(mem, 0, PGSIZE);
+  memmove(mem, msg, strlen(msg));
+
+  // Mapea con PTE_U | PTE_R (sin PTE_W)
+  if(mappages(p->pagetable, va, PGSIZE, (uint64)mem, PTE_R | PTE_U) < 0){
+    kfree(mem);
+    return -1;
+  }
+
+  return 0;
+}

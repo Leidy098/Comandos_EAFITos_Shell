@@ -148,7 +148,8 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_EAFITos\
 	$U/_ttrace\
-	$U/_tdumpvm
+	$U/_tdumpvm\
+	$U/_tmemro
 fs.img: mkfs/mkfs README user/EAFITos.txt $(UPROGS)
 	mkfs/mkfs fs.img README user/EAFITos.txt $(UPROGS)
 

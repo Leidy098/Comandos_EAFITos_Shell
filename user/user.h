@@ -50,3 +50,4 @@ void printf(const char*, ...) __attribute__ ((format (printf, 1, 2)));
 void* malloc(uint);
 void free(void*);
 int trace(int mask);
+int map_ro(void *va);
