@@ -1,5 +1,7 @@
 K=kernel
 U=user
+M=src/utils/memory
+A=src/utils/apps
 
 OBJS = \
   $K/entry.o \
@@ -26,6 +28,7 @@ OBJS = \
   $K/pipe.o \
   $K/exec.o \
   $K/sysfile.o \
+  $M/memory_syscalls.o \
   $K/kernelvec.o \
   $K/plic.o \
   $K/virtio_disk.o
@@ -95,7 +98,7 @@ $K/%.o: $K/%.S
 	$(CC) -march=rv64gc -g -c -o $@ $<
 
 tags: $(OBJS)
-	etags kernel/*.S kernel/*.c
+	etags kernel/*.S kernel/*.c src/utils/memory/*.c src/utils/apps/*.c
 
 ULIB = $U/ulib.o $U/usys.o $U/printf.o $U/umalloc.o
 
@@ -110,11 +113,47 @@ $U/usys.S : $U/usys.pl
 $U/usys.o : $U/usys.S
 	$(CC) $(CFLAGS) -c -o $U/usys.o $U/usys.S
 
+$M/%.o: $M/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$A/%.o: $A/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $U/_forktest: $U/forktest.o $(ULIB)
 	# forktest has less library code linked in - needs to be small
 	# in order to be able to max out the proc table.
 	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $U/_forktest $U/forktest.o $U/ulib.o $U/usys.o
 	$(OBJDUMP) -S $U/_forktest > $U/forktest.asm
+
+$U/_thello: $M/thello.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/thello.o $(ULIB)
+	$(OBJDUMP) -S $@ > $M/thello.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $M/thello.sym
+
+$U/_ttrace: $M/ttrace.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/ttrace.o $(ULIB)
+	$(OBJDUMP) -S $@ > $M/ttrace.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $M/ttrace.sym
+
+$U/_tdumpvm: $M/tdumpvm.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/tdumpvm.o $(ULIB)
+	$(OBJDUMP) -S $@ > $M/tdumpvm.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $M/tdumpvm.sym
+
+$U/_tmemro: $M/tmemro.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/tmemro.o $(ULIB)
+	$(OBJDUMP) -S $@ > $M/tmemro.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $M/tmemro.sym
+
+$U/_tuargs: $M/tuargs.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/tuargs.o $(ULIB)
+	$(OBJDUMP) -S $@ > $M/tuargs.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $M/tuargs.sym
+
+$U/_EAFITos: $A/EAFITos.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $A/EAFITos.o $(ULIB)
+	$(OBJDUMP) -S $@ > $A/EAFITos.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $A/EAFITos.sym
 
 mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 	gcc -Wno-unknown-attributes -I. -o mkfs/mkfs mkfs/mkfs.c
@@ -154,11 +193,11 @@ UPROGS=\
 fs.img: mkfs/mkfs README user/EAFITos.txt $(UPROGS)
 	mkfs/mkfs fs.img README user/EAFITos.txt $(UPROGS)
 
--include kernel/*.d user/*.d
+-include kernel/*.d user/*.d src/utils/memory/*.d src/utils/apps/*.d
 
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
-	*/*.o */*.d */*.asm */*.sym \
+	*/*.o */*.d */*.asm */*.sym src/utils/memory/*.o src/utils/memory/*.d src/utils/memory/*.asm src/utils/memory/*.sym src/utils/apps/*.o src/utils/apps/*.d src/utils/apps/*.asm src/utils/apps/*.sym \
 	$K/kernel fs.img \
 	mkfs/mkfs .gdbinit \
         $U/usys.S \

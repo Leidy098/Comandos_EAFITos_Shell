@@ -5,12 +5,13 @@ int
 main(void)
 {
   const int growth = 2 * 4096;
+  char *probe;
 
   printf("tdumpvm: pid=%d\n", getpid());
   dumpvm();
 
-  char *probe = sbrklazy(growth);
-  if (probe == SBRK_ERROR) {
+  probe = sbrklazy(growth);
+  if(probe == SBRK_ERROR) {
     fprintf(2, "tdumpvm: sbrklazy fallo\n");
     exit(1);
   }

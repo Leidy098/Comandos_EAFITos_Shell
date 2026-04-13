@@ -51,7 +51,6 @@ main(void)
       break;
     }
 
-
     // ----------------------------------------
     // Comando 'Ayuda' muestra lista de comandos.
     // ----------------------------------------
@@ -70,7 +69,6 @@ main(void)
       continue;
     }
 
-
     // ----------------------------------------
     // Comando 'Listar' muestra contenido del directorio actual.
     // ----------------------------------------
@@ -88,7 +86,6 @@ main(void)
         wait(0);
       continue;
     }
-
 
     // ----------------------------------------
     // Comando 'Leer <archivo>' muestra contenido de un archivo de texto
@@ -131,7 +128,6 @@ main(void)
       continue;
     }
 
-
     // ----------------------------------------
     // Comando 'Limpiar' simula limpiar la pantalla.
     // ----------------------------------------
@@ -142,7 +138,6 @@ main(void)
         printf("\n");
       continue;
     }
-
 
     // ----------------------------------------
     // Comando 'Crear <archivo>' crea un nuevo archivo vacío.
@@ -167,7 +162,6 @@ main(void)
       printf("Archivo creado: %s\n", args[1]);
       continue;
     }
-
 
     // ----------------------------------------
     // Comando 'Eliminar <archivo>' elimina archivo con confirmación
@@ -203,7 +197,6 @@ main(void)
       printf("Archivo eliminado: %s\n", args[1]);
       continue;
     }
-
 
     // ----------------------------------------
     // Comando 'Calc <num1> <operador> <num2>' calculadora básica.
