@@ -1,135 +1,185 @@
-# README - `EAFITos.c`
+# README - EAFITos
 
-## Como ejecutarlo en xv6
+EAFITos es una shell educativa implementada en C sobre xv6, desarrollada como proyecto del curso de Sistemas Operativos de la Universidad EAFIT. Combina comandos básicos de interacción con el sistema y comandos avanzados de gestión de memoria mediante syscalls personalizadas.
 
-`EAFITos` ya aparece en `UPROGS` dentro del `Makefile`, por lo que se compila con el sistema.
+---
 
-1. Compila y arranca xv6 con `make qemu`.
-2. En la consola de xv6, ejecuta:
+## Cómo ejecutarlo en xv6
 
-```sh
-EAFITos
-```
+1. Compila y arranca xv6:
 
-Veras el prompt:
+   make qemu
 
-```text
-EAFITos>
-```
+2. En la consola de xv6, ejecuta la shell:
 
-## Comandos disponibles
+   EAFITos
 
-- `ayuda`
-  - Muestra la lista de comandos soportados.
+Verás el prompt:
 
-- `listar`
-  - Lista el contenido del directorio actual (internamente ejecuta `ls`).
+   ===============================================================
+                       Bienvenido a EAFITos
+   ===============================================================
+   EAFITos>
 
-- `leer <archivo>`
-  - Creé un archivo de ejemplo usa: `leer EAFITos.txt`
-  - Muestra el contenido de un archivo (internamente ejecuta `cat`).
-  
-- `tiempo`
-  - Muestra el tiempo transcurrido desde el arranque de xv6 en formato `HH:MM:SS`.
+---
 
-- `calc <num1> <operador> <num2>`
-  - Calculadora basica con `+`, `-`, `*`, `/`.
-  - Ejemplos:
-    - `calc 2 + 3`
-    - `calc 8 / 2`
+## Comandos de la shell (Proyecto 1)
 
-- `crear <archivo>`
-  - Crea un archivo vacio (o lo abre si ya existe).
-  - Ejemplo: `crear notas.txt`
+ayuda          - Muestra la lista de comandos disponibles
+listar         - Lista el contenido del directorio actual (ls)
+leer <archivo> - Muestra el contenido de un archivo (cat)
+tiempo         - Muestra el tiempo desde el arranque en HH:MM:SS
+calc <n1> <op> <n2> - Calculadora básica con + - * /
+crear <archivo>     - Crea un archivo vacío
+eliminar <archivo>  - Elimina un archivo con confirmación
+limpiar        - Simula limpiar la pantalla
+salir          - Cierra la shell EAFITos
 
-- `eliminar <archivo>`
-  - Elimina un archivo con confirmacion (`si/no`).
-  - Ejemplo: `eliminar notas.txt`
+Ejemplo de sesión básica:
 
-- `limpiar`
-  - Simula limpiar pantalla imprimiendo lineas en blanco.
+   EAFITos> ayuda
+   EAFITos> listar
+   EAFITos> leer EAFITos.txt
+   EAFITos> tiempo
+   EAFITos> calc 10 * 4
+   Resultado: 40
+   EAFITos> crear notas.txt
+   EAFITos> eliminar notas.txt
+   EAFITos> salir
 
-- `salir`
-  - Cierra el shell `EAFITos`.
+---
 
-## Ejemplo de sesion
+## Comandos de gestión de memoria (Proyecto 2)
+--- 1: Primera syscall de punta a punta - hello() ---
 
-```text
-$ EAFITos
-EAFITos> ayuda
-EAFITos> listar
-EAFITos> leer EAFITos.txt
-EAFITos> tiempo
-EAFITos> crear notas.txt
-EAFITos> eliminar notas.txt
-EAFITos> calc 10 * 4
-Resultado: 40
-EAFITos> limpiar
-EAFITos> salir
-```
+Se creó una syscall mínima llamada hello() que retorna el número 42.
+El objetivo fue entender el camino completo que recorre una syscall:
+desde que el usuario la invoca hasta que el kernel la procesa y retorna
+el resultado. También se instrumentó temporalmente el manejador de traps
+para ver en consola cuándo ocurre una ecall desde usuario.
 
-## Detalles tecnicos (implementacion)
+Cómo correrlo:
+   thello
 
-- Usa `fork()` + `exec()` para delegar `listar` y `leer` a `ls` y `cat`.
-- Usa `uptime()` para calcular el tiempo desde el arranque.
-- Usa `open(..., O_CREATE | O_WRONLY)` para crear archivos.
-- Usa `unlink()` para eliminar archivos.
-- El parseo de entrada separa argumentos por espacios/tabulaciones y admite hasta **5 argumentos**.
+Salida esperada:
+   thello: hello() retorno 42
+
+--- Punto 2: Mini strace - trazado selectivo de syscalls ---
+
+Se implementó la syscall trace(int mask) que permite trazar selectivamente
+las llamadas al sistema de un proceso mediante una máscara de bits.
+
+Uso:
+   ttrace <mascara> <programa> [args...]
+
+Ejemplos:
+   ttrace 128 echo hola       (traza exec, syscall 7)
+   ttrace 65536 echo hola     (traza write, syscall 16)
+
+Salida esperada:
+   [strace] pid=3 name=ttrace syscall#=7 a0=16336 a1=16288 a2=9
+   hola
+
+--- Punto 3: Explorar la tabla de páginas - dumpvm() ---
+
+Se creó la syscall dumpvm() que imprime la tabla de páginas del proceso
+que la invoca. Muestra cada entrada válida con su nivel de indentación,
+dirección física y permisos de memoria
+
+Cómo correrlo:
+   tdumpvm
+
+Salida esperada (ejemplo):
+   tdumpvm: PID=3 - tabla ANTES de asignacion:
+   page table 0x0000000087f6b000
+    ..0: pte=0x... pa=0x... [RU]
+    ..1: pte=0x... pa=0x... [RWU]
+    ..2: pte=0x... pa=0x... [XU]
+   
+   tdumpvm: tabla DESPUES de asignacion local:
+   page table 0x0000000087f6b000
+    ..0: pte=0x... pa=0x... [RU]
+    ..1: pte=0x... pa=0x... [RWU]
+    ..2: pte=0x... pa=0x... [XU]
+    ..3: pte=0x... pa=0x... [RWU]
+
+--- Punto 4: Permisos de memoria - página solo-lectura con page fault ---
+
+Se implementó la syscall map_ro(void *va) que mapea una página de memoria
+con permisos solo-lectura (PTE_R | PTE_U, sin PTE_W). El kernel copia un
+mensaje corto a esa página. 
+
+Uso:
+   tmemro
+
+Salida esperada:
+   tmemro: contenido leido: Pagina solo lectura desde kernel
+   tmemro: intentando escribir (debe fallar)...
+   [map_ro] page fault: scause=15 stval=0x0000000040000000 pid=4
+
+El proceso es terminado por el kernel al detectar la escritura ilegal
+y el shell recupera el control sin pánico.
+
+  --- Punto 5: Robustez con punteros inválidos - tuargs ---
+
+Se creó el programa tuargs que prueba qué pasa cuando se le pasan
+punteros inválidos a las syscalls. El objetivo fue verificar que el
+kernel detecta correctamente los errores y retorna -1 sin caerse ni
+entrar en pánico. También se agregaron impresiones de depuración para
+ver cómo los registros a0..a5 se transforman en argumentos de alto nivel.
+
+Cómo correrlo:
+   tuargs
+
+Salida esperada:
+    ok
+    tuargs: write puntero valido -> 3 OK
+    tuargs: write puntero invalido -> -1 OK
+    tuargs: open string invalido -> -1 OK
+    tuargs: pipe puntero valido -> 0 OK
+    tuargs: pipe puntero invalido -> -1 OK  
+
+## Detalles técnicos
+
+- La shell usa fork() + exec() para delegar listar y leer a ls y cat.
+- trace_mask se hereda de padre a hijo en kfork(), por lo que el trazado
+  persiste después de exec.
+- map_ro asigna una página física con kalloc(), copia un mensaje desde el
+  kernel y la mapea con mappages() sin el bit PTE_W.
+- El manejo de page fault en trap.c usa walk() para verificar que la página
+  existe antes de desmapearla, evitando pánico en freewalk.
+- El parseo de entrada de la shell admite hasta 5 argumentos separados
+  por espacios o tabulaciones.
+
+---
 
 ## Limitaciones conocidas
 
+- calc solo trabaja con enteros.
+- limpiar no borra la terminal realmente, solo imprime saltos de línea.
+- El buffer de entrada de la shell es de 128 caracteres.
 - No soporta comillas ni rutas con espacios.
-- `calc` solo trabaja con enteros.
-- `limpiar` no borra la terminal realmente; solo imprime saltos de linea.
-- El buffer de entrada es de 128 caracteres.
 
+---
 
+## Referencias
+
+- MIT. (2023). A simple, Unix-like teaching operating system.
+  https://pdos.csail.mit.edu/6.828/2025/xv6.html
+- Silberschatz, A., Galvin, P. B., & Gagne, G. (2020).
+  Operating System Concepts (10th ed.). Wiley.
+- Tanenbaum, A. S., & Bos, H. (2015).
+  Modern Operating Systems (4th ed.). Pearson Education.
+- Kerrisk, M. (2010). The Linux Programming Interface. No Starch Press.
+
+---
 
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
+Version 6 (v6). xv6 loosely follows the structure and style of v6,
 but is implemented for a modern RISC-V multiprocessor using ANSI C.
 
-ACKNOWLEDGMENTS
+Para compilar y correr xv6 necesitas el toolchain RISC-V newlib desde
+https://github.com/riscv/riscv-gnu-toolchain y qemu compilado para
+riscv64-softmmu. Una vez instalados corre: make qemu
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)).  See also https://pdos.csail.mit.edu/6.1810/, which provides
-pointers to on-line resources for v6.
-
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
-
-We are also grateful for the bug reports and patches contributed by
-Abhinavpatel00, Takahiro Aoyagi, Marcelo Arroyo, Hirbod Behnam, Silas
-Boyd-Wickizer, Anton Burtsev, carlclone, Ian Chen, clivezeng, Dan
-Cross, Cody Cutler, Mike CAT, Tej Chajed, Asami Doi,Wenyang Duan,
-echtwerner, eyalz800, Nelson Elhage, Saar Ettinger, Alice Ferrazzi,
-Nathaniel Filardo, flespark, Peter Froehlich, Yakir Goaron, Shivam
-Handa, Matt Harvey, Bryan Henry, jaichenhengjie, Jim Huang, Matúš
-Jókay, John Jolly, Alexander Kapshuk, Anders Kaseorg, kehao95,
-Wolfgang Keller, Jungwoo Kim, Jonathan Kimmitt, Eddie Kohler, Vadim
-Kolontsov, Austin Liew, l0stman, Pavan Maddamsetti, Imbar Marinescu,
-Yandong Mao, Matan Shabtay, Hitoshi Mitake, Carmi Merimovich,
-mes900903, Mark Morrissey, mtasm, Joel Nider, Hayato Ohhashi,
-OptimisticSide, papparapa, phosphagos, Harry Porter, Greg Price, Zheng
-qhuo, Quancheng, RayAndrew, Jude Rich, segfault, Ayan Shafqat, Eldar
-Sehayek, Yongming Shen, Fumiya Shigemitsu, snoire, Taojie, Cam Tenny,
-tyfkda, Warren Toomey, Stephen Tu, Alissa Tung, Rafael Ubal, unicornx,
-Amane Uehara, Pablo Ventura, Luc Videau, Xi Wang, WaheedHafez, Keiichi
-Watanabe, Lucas Wolf, Nicolas Wolovick, wxdao, Grant Wu, x653, Andy
-Zhang, Jindong Zhang, Icenowy Zheng, ZhUyU1997, and Zou Chang Wei.
-
-ERROR REPORTS
-
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
-operating system for MIT's 6.1810, so we are more interested in
-simplifications and clarifications than new features.
-
-BUILDING AND RUNNING XV6
-
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu.  Once they are installed, and in your shell
-search path, you can run "make qemu".
+Reportar errores a: kaashoek,rtm@mit.edu
