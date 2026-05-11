@@ -151,11 +151,15 @@ memcpy(void *dst, const void *src, uint n)
 
 char *
 sbrk(int n) {
+  // sbrk() here is implemented with lazy allocation so the heap grows
+  // immediately in the process size, but physical pages are allocated
+  // only on demand via page faults.
   return sys_sbrk(n, SBRK_LAZY);
 }
 
 char *
 sbrklazy(int n) {
+  // Alias to the lazy sbrk implementation.
   return sys_sbrk(n, SBRK_LAZY);
 }
 

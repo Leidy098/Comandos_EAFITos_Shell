@@ -10,6 +10,7 @@
 uint64
 sys_hello(void)
 {
+  // Syscall de comprobacion simple: devuelve un valor constante.
   return 42;
 }
 
@@ -18,6 +19,7 @@ sys_trace(void)
 {
   int mask;
 
+  // Configura la mascara de trazado de syscalls para el proceso actual.
   argint(0, &mask);
   myproc()->trace_mask = mask;
   return 0;
@@ -28,6 +30,7 @@ sys_dumpvm(void)
 {
   struct proc *p = myproc();
 
+  // Imprime informacion del proceso y la tabla de paginas.
   printf("dumpvm: pid=%d name=%s sz=%p\n", p->pid, p->name, (void *)p->sz);
   vmprint(p->pagetable);
   return 0;

@@ -71,13 +71,16 @@ usertrap(void)
     // ok
   } else if((r_scause() == 15 || r_scause() == 13) &&
             vmfault(p->pagetable, r_stval(), (r_scause() == 13)? 1 : 0) != 0) {
+    // A lazy page fault occurred on a valid heap address and vmfault()
+    // successfully backed the page with physical memory.
     printf("lazy page fault handled pid=%d va=%p scause=%ld\n",
            p->pid, (void *)r_stval(), r_scause());
   } else if(r_scause() == 15 || r_scause() == 13) {
+    // Fault was not recoverable: either the address was invalid or we
+    // could not allocate the page.
     printf("page fault: pid=%d scause=%ld stval=%p\n",
            p->pid, r_scause(), (void *)r_stval());
     uint64 fault_va = PGROUNDDOWN(r_stval());
-    // Desmapea solo si la página existe en la tabla
     pte_t *pte = walk(p->pagetable, fault_va, 0);
     if(pte && (*pte & PTE_V))
       uvmunmap(p->pagetable, fault_va, 1, 1);

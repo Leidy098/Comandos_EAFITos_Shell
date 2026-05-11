@@ -7,6 +7,7 @@ main(void)
   const int growth = 2 * 4096;
   char *probe;
 
+  // Verificar el estado inicial de la tabla de páginas del proceso.
   printf("tdumpvm: pid=%d\n", getpid());
   dumpvm();
 

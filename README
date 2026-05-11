@@ -76,6 +76,23 @@ EAFITos> salir
 - Usa `unlink()` para eliminar archivos.
 - El parseo de entrada separa argumentos por espacios/tabulaciones y admite hasta **5 argumentos**.
 
+## Pruebas de memoria y nuevos syscalls en xv6
+
+Este proyecto incluye mejoras de memoria en el kernel xv6 para soportar:
+
+- `hello()` — syscall de prueba que retorna 42.
+- `trace(mask)` — habilita el trazado selectivo de syscalls según una máscara de bits.
+- `dumpvm()` — muestra la tabla de páginas del proceso actual.
+- `map_ro(va)` — mapea una página de solo lectura en la dirección virtual `va`.
+- `sbrk()`/`sbrklazy()` — reserva heap de manera perezosa y asigna páginas en el page fault.
+
+Programas de prueba incluidos:
+
+- `tlazy` — solicita 4 páginas con `sbrk()` y las toca una por una, comprobando que los page faults perezosos se resuelven correctamente.
+- `tdumpvm` — llama a `dumpvm()` antes y después de tocar el heap reservado, mostrando el crecimiento de la tabla de páginas.
+
+Estas pruebas se compilan automáticamente y se empaquetan en `fs.img`.
+
 ## Limitaciones conocidas
 
 - No soporta comillas ni rutas con espacios.

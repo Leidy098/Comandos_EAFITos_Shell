@@ -48,13 +48,14 @@ sys_sbrk(void)
   addr = myproc()->sz;
 
   if(t == SBRK_EAGER || n < 0) {
+    // Eager allocation for shrink/grow or when the caller requests it.
     if(growproc(n) < 0) {
       return -1;
     }
   } else {
-    // Lazily allocate memory for this process: increase its memory
-    // size but don't allocate memory. If the processes uses the
-    // memory, vmfault() will allocate it.
+    // Lazy allocation: reserve the address range in the process size,
+    // but do not allocate physical pages yet. The page fault handler
+    // will allocate pages on demand when the program accesses them.
     if(addr + n < addr)
       return -1;
     if(addr + n > TRAPFRAME)
