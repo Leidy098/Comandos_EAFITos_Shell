@@ -1,192 +1,100 @@
-# Memory Utils
+# Memory Utils — Proyecto 3: Lazy Allocation
 
-Esta carpeta centraliza el trabajo adicional que se hizo para los 5 comandos
-relacionados con syscalls, memoria y robustez.
+Implementación de Lazy Allocation sobre xv6-riscv (RISC-V, MIT).
 
-## Codigo fuente movido aqui
+## Archivos de esta carpeta
 
-### Kernel
+| Archivo | Rol |
+|---------|-----|
+| `memory_syscalls.c` | Implementaciones de syscalls del kernel |
+| `tlazy.c` | Prueba Ej.4: sbrk + accesos + getpfcount |
+| `tmmap_sim.c` | Prueba Ej.5: mapzero, páginas rellenas con `'A'` |
+| `tsbrk2.c` / `tsbrk3.c` | Pruebas Ej.2/3: lazy allocation básica |
 
-- `memory_syscalls.c`
-  - Contiene las implementaciones de:
-    - `sys_hello()`
-    - `sys_trace()`
-    - `sys_dumpvm()`
-    - `sys_map_ro()`
+---
 
-### User space
+## Ejercicios implementados
 
-- `thello.c`
-  - Prueba `hello()`
-- `ttrace.c`
-  - Prueba `trace(int mask)`
-- `tdumpvm.c`
-  - Prueba `dumpvm()`
-- `tmemro.c`
-  - Prueba `map_ro(void *va)`
-- `tuargs.c`
-  - Prueba robustez de argumentos, punteros válidos e inválidos
+### Ej.1 — Observar Page Faults (`kernel/trap.c`)
+Detección de `scause == 13` (load) y `scause == 15` (store) en `usertrap()`.
+Faults inválidos imprimen `page fault: pid=... scause=... stval=...` y matan el proceso.
+Prueba: `tpf` (en `user/tpf.c`).
 
-## Que sigue viviendo fuera de esta carpeta
+### Ej.2 — `sbrk()` Lazy (`kernel/sysproc.c`)
+Para `n > 0`: solo incrementa `p->sz`, sin asignar páginas físicas.
+Para `n < 0`: usa `growproc` (comportamiento original).
 
-Algunas partes no conviene moverlas porque forman parte del flujo base de xv6:
+### Ej.3 — Lazy Allocation real (`kernel/vm.c`, `kernel/trap.c`)
+`vmfault()` asigna la página física cuando el proceso la toca por primera vez.
+- `uvmunmap` y `uvmcopy` toleran PTEs no mapeadas (`continue`).
+- `copyin`, `copyout` y `copyinstr` llaman `vmfault()` si la página no está mapeada.
+- Guard page manejada implícitamente vía `ismapped()`.
 
-- `kernel/syscall.c`
-  - Registro de syscalls
-  - impresión de argumentos crudos `trapframe->a0..a5`
-- `kernel/syscall.h`
-  - números de syscall
-- `kernel/defs.h`
-  - prototipos del kernel
-- `kernel/proc.h`
-  - campo `trace_mask`
-- `kernel/console.c`
-  - propagación correcta de errores en `copyin/copyout`
-- `kernel/vm.c`
-  - `copyin`, `copyout`, `copyinstr`
-- `user/user.h`
-  - declaraciones de syscalls visibles para usuario
-- `user/usys.pl`
-  - generación de stubs de syscalls
-- `Makefile`
-  - reglas para compilar desde `src/utils/memory`
+### Ej.4 — Contador de page faults (`kernel/proc.h`, `kernel/trap.c`, syscall `getpfcount`)
+- Campo `int pf_count` en `struct proc`; se inicializa a 0 en `allocproc` y en cada hijo de `fork`.
+- `p->pf_count++` solo en faults lazy atendidos exitosamente.
+- Syscall `getpfcount()` (#26) retorna el contador del proceso actual.
+- Prueba: `tlazy`
 
-## Los 5 comandos
-
-### 1. hello()
-
-Syscall básica de prueba.
-
-- Retorna `42`
-- Implementación: `memory_syscalls.c`
-- Prueba: `thello.c`
-
-Ejecutar en xv6:
-
-```sh
-thello
+```
+$ tlazy
+tlazy: inicio, pf_count=0
+tlazy: sbrk(24576) retorno 0x... (lazy, sin paginas fisicas aun)
+tlazy: pf_count tras sbrk=0 (debe ser 0)
+...
+tlazy: pf_count final=6 (esperado 6)
+tlazy: SUCCESS
 ```
 
-Salida esperada:
+### Ej.5 — Simulación mmap (`kernel/proc.h`, `kernel/trap.c`, syscall `mapzero`)
+- `struct vregion {start, size, used}` + `vregions[NVREG]` (NVREG=4) en `struct proc`.
+- Syscall `mapzero(size)` (#27): reserva rango virtual sin mapear, registra la vregión.
+- `usertrap()` revisa vregiones **antes** de `vmfault()`; rellena cada página con `0x41` (`'A'`).
+- Prueba: `tmmap_sim`
 
-```text
-hello() returned 42
+```
+$ tmmap_sim
+tmmap_sim: mapzero(12288) retorno 0x...
+tmmap_sim: pagina 0 primer byte = 'A' (0x41)
+tmmap_sim: pagina 1 primer byte = 'A' (0x41)
+tmmap_sim: pagina 2 primer byte = 'A' (0x41)
+tmmap_sim: primera pagina completa OK (4096 bytes = 'A')
+tmmap_sim: SUCCESS
 ```
 
-### 2. trace(int mask)
+---
 
-Activa el trazado de syscalls usando una máscara de bits.
+## Archivos del kernel modificados
 
-- Guarda la máscara en `trace_mask`
-- Imprime los registros crudos `a0..a5` antes del handler
-- Implementación principal: `memory_syscalls.c`
-- Integración del trace: `kernel/syscall.c`
-- Prueba: `ttrace.c`
+| Archivo | Qué se cambió |
+|---------|---------------|
+| `kernel/trap.c` | Manejo de PF: vregion → vmfault → error |
+| `kernel/vm.c` | `vmfault()`, `uvmunmap`, `uvmcopy`, `copyin`, `copyout`, `copyinstr` |
+| `kernel/proc.h` | `struct vregion`, `pf_count`, `vregions[NVREG]` |
+| `kernel/proc.c` | Init en `allocproc` y `kfork` |
+| `kernel/sysproc.c` | `sys_sbrk()` lazy, `sys_getpfcount()` |
+| `kernel/syscall.h` | Números 26 (`getpfcount`) y 27 (`mapzero`) |
+| `kernel/syscall.c` | Externs y entradas en tabla |
+| `kernel/param.h` | `NVREG 4` |
+| `user/user.h` | Declaraciones `getpfcount`, `mapzero` |
+| `user/usys.pl` | Stubs de las nuevas syscalls |
+| `Makefile` | Reglas y UPROGS para `tlazy`, `tmmap_sim` |
+| `src/utils/memory/memory_syscalls.c` | `sys_mapzero()` |
 
-Ejemplo:
+---
 
-```sh
-ttrace 33554431 tuargs
-```
-
-Salida esperada:
-
-```text
-[strace] pid=... name=tuargs syscall#=... raw a0=... a1=... a2=... a3=... a4=... a5=...
-```
-
-### 3. dumpvm()
-
-Imprime la tabla de páginas del proceso actual.
-
-- Muestra PID, nombre y tamaño
-- Llama a `vmprint(...)`
-- Implementación: `memory_syscalls.c`
-- Prueba: `tdumpvm.c`
-
-Ejecutar:
-
-```sh
-tdumpvm
-```
-
-### 4. map_ro(void *va)
-
-Mapea una página de usuario como solo lectura.
-
-- Redondea dirección con `PGROUNDDOWN`
-- Reserva memoria física
-- Mapea con `PTE_R | PTE_U`
-- Implementación: `memory_syscalls.c`
-- Prueba: `tmemro.c`
-
-Ejecutar:
-
-```sh
-tmemro
-```
-
-Resultado esperado:
-
-- la lectura funciona
-- la escritura provoca un page fault controlado
-
-### 5. Robustez de argumentos de syscalls
-
-No es una syscall nueva, sino una mejora del sistema.
-
-Incluye:
-
-- impresión de `trapframe->a0..a5`
-- validación de punteros
-- retorno `-1` para punteros inválidos
-- manejo correcto de errores sin `panic`
-
-Archivos importantes:
-
-- `kernel/syscall.c`
-- `kernel/console.c`
-- `kernel/vm.c`
-- `tuargs.c`
-
-Ejecutar:
-
-```sh
-tuargs
-```
-
-Salida esperada:
-
-```text
-ok
-tuargs: write puntero valido -> 3 OK
-tuargs: write puntero invalido -> -1 OK
-tuargs: open string invalido -> -1 OK
-tuargs: pipe puntero valido -> 0 OK
-tuargs: pipe puntero invalido -> -1 OK
-```
-
-## Como compilar y probar
-
-Desde la raiz del proyecto:
+## Compilar y probar
 
 ```bash
-make
 make qemu
 ```
 
-Dentro de xv6 puedes probar:
+Dentro de xv6:
 
 ```sh
-thello
-tdumpvm
-tmemro
-tuargs
-ttrace 33554431 tuargs
+tpf        # Ej.1: page faults inválidos
+tsbrk2     # Ej.2/3: lazy sbrk
+tsbrk3     # Ej.3: lazy con múltiples páginas
+tlazy      # Ej.4: getpfcount
+tmmap_sim  # Ej.5: mapzero con patrón 'A'
 ```
-
-## Nota de organizacion
-
-Los programas de prueba y las syscalls nuevas ahora viven en
-`src/utils/memory`, pero siguen compilando como comandos normales de xv6
-porque el `Makefile` fue ajustado para construirlos desde esta carpeta.
