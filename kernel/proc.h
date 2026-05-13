@@ -1,3 +1,10 @@
+// Virtual memory region for lazy-zeroed anonymous mappings (mapzero).
+struct vregion {
+  uint64 start;  // base virtual address
+  int    size;   // length in bytes
+  int    used;   // 1 if slot is active
+};
+
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -92,6 +99,8 @@ struct proc {
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
   int trace_mask;   // máscara de syscalls a trazar (actividad 2)
+  int pf_count;     // contador de page faults lazy atendidos
+  struct vregion vregions[NVREG]; // regiones virtuales lazy-zero (mapzero)
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process

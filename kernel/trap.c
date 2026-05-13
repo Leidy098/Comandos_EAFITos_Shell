@@ -69,22 +69,59 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else if((r_scause() == 15 || r_scause() == 13) &&
-            vmfault(p->pagetable, r_stval(), (r_scause() == 13)? 1 : 0) != 0) {
-    // A lazy page fault occurred on a valid heap address and vmfault()
-    // successfully backed the page with physical memory.
-    printf("lazy page fault handled pid=%d va=%p scause=%ld\n",
-           p->pid, (void *)r_stval(), r_scause());
   } else if(r_scause() == 15 || r_scause() == 13) {
-    // Fault was not recoverable: either the address was invalid or we
-    // could not allocate the page.
-    printf("page fault: pid=%d scause=%ld stval=%p\n",
-           p->pid, r_scause(), (void *)r_stval());
-    uint64 fault_va = PGROUNDDOWN(r_stval());
-    pte_t *pte = walk(p->pagetable, fault_va, 0);
-    if(pte && (*pte & PTE_V))
-      uvmunmap(p->pagetable, fault_va, 1, 1);
-    setkilled(p);
+    uint64 fault_va = r_stval();
+    int handled = 0;
+
+    // Ej.5: comprobar si el fault cae en una vregion antes que el lazy normal.
+    for(int i = 0; i < NVREG; i++){
+      struct vregion *vr = &p->vregions[i];
+      if(!vr->used)
+        continue;
+      if(fault_va >= vr->start && fault_va < vr->start + vr->size){
+        uint64 pg = PGROUNDDOWN(fault_va);
+        if(!ismapped(p->pagetable, pg)){
+          char *mem = kalloc();
+          if(mem == 0){
+            setkilled(p);
+          } else {
+            memset(mem, 0x41, PGSIZE);  // patrón 'A'
+            if(mappages(p->pagetable, pg, PGSIZE, (uint64)mem,
+                        PTE_W|PTE_U|PTE_R) != 0){
+              kfree(mem);
+              setkilled(p);
+            } else {
+              p->pf_count++;
+              handled = 1;
+            }
+          }
+        } else {
+          handled = 1;  // ya mapeada (ej. segundo fault en la misma página)
+        }
+        break;
+      }
+    }
+
+    // Ej.3: lazy allocation normal del heap si no fue una vregion.
+    if(!handled && !killed(p)){
+      if(vmfault(p->pagetable, fault_va, (r_scause() == 13)? 1 : 0) != 0){
+        p->pf_count++;
+        handled = 1;
+        printf("lazy page fault handled pid=%d va=%p scause=%ld\n",
+               p->pid, (void *)fault_va, r_scause());
+      }
+    }
+
+    if(!handled && !killed(p)){
+      // Fault no recuperable: dirección inválida o sin memoria.
+      printf("page fault: pid=%d scause=%ld stval=%p\n",
+             p->pid, r_scause(), (void *)fault_va);
+      uint64 pg = PGROUNDDOWN(fault_va);
+      pte_t *pte = walk(p->pagetable, pg, 0);
+      if(pte && (*pte & PTE_V))
+        uvmunmap(p->pagetable, pg, 1, 1);
+      setkilled(p);
+    }
   } else {
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());

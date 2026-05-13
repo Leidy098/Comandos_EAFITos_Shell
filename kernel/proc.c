@@ -146,6 +146,10 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  p->pf_count = 0;
+  for(int i = 0; i < NVREG; i++)
+    p->vregions[i].used = 0;
+
   return p;
 }
 
@@ -283,6 +287,9 @@ kfork(void)
   np->trapframe->a0 = 0;
 
   np->trace_mask = p->trace_mask;
+  np->pf_count = 0;
+  for(int i = 0; i < NVREG; i++)
+    np->vregions[i] = p->vregions[i];
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])

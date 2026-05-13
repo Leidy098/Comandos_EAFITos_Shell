@@ -24,3 +24,5 @@
 #define SYS_trace  23
 #define SYS_dumpvm 24
 #define SYS_map_ro 25
+#define SYS_getpfcount 26
+#define SYS_mapzero    27

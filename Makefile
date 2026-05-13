@@ -149,6 +149,11 @@ $U/_tlazy: $M/tlazy.o $(ULIB) $U/user.ld
 	$(OBJDUMP) -S $@ > $M/tlazy.asm
 	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
 
+$U/_tmmap_sim: $M/tmmap_sim.o $(ULIB) $U/user.ld
+	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/tmmap_sim.o $(ULIB)
+	$(OBJDUMP) -S $@ > $M/tmmap_sim.asm
+	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $M/tmmap_sim.sym
+
 $U/_tsbrk2: $M/tsbrk2.o $(ULIB) $U/user.ld
 	$(LD) $(LDFLAGS) -T $U/user.ld -o $@ $M/tsbrk2.o $(ULIB)
 	$(OBJDUMP) -S $@ > $M/tsbrk2.asm
@@ -206,6 +211,8 @@ UPROGS=\
 	$U/_tsbrk2\
 	$U/_tsbrk3\
 	$U/_tuargs\
+	$U/_tlazy\
+	$U/_tmmap_sim\
 	$U/_tpf
 fs.img: mkfs/mkfs README user/EAFITos.txt $(UPROGS)
 	mkfs/mkfs fs.img README user/EAFITos.txt $(UPROGS)

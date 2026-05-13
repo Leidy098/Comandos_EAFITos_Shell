@@ -96,6 +96,12 @@ sys_kill(void)
   return kkill(pid);
 }
 
+uint64
+sys_getpfcount(void)
+{
+  return myproc()->pf_count;
+}
+
 // return how many clock tick interrupts have occurred
 // since start.
 uint64

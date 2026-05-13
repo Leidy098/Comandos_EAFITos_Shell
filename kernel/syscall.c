@@ -105,6 +105,8 @@ extern uint64 sys_close(void);
 extern uint64 sys_trace(void);
 extern uint64 sys_dumpvm(void);
 extern uint64 sys_map_ro(void);
+extern uint64 sys_getpfcount(void);
+extern uint64 sys_mapzero(void);
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
 static uint64 (*syscalls[])(void) = {
@@ -133,6 +135,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_trace]  sys_trace,
 [SYS_dumpvm] sys_dumpvm,
 [SYS_map_ro] sys_map_ro,
+[SYS_getpfcount] sys_getpfcount,
+[SYS_mapzero]    sys_mapzero,
 };
 
 void

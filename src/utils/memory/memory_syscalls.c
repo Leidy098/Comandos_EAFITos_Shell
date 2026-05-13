@@ -36,6 +36,50 @@ sys_dumpvm(void)
   return 0;
 }
 
+// mapzero(size): reserva una region virtual de 'size' bytes, sin mapear
+// fisicamente. Al acceder, usertrap rellena cada pagina con 0x41 ('A').
+// Retorna la direccion virtual de inicio, o -1 si no hay slots libres
+// o el tamano es invalido.
+uint64
+sys_mapzero(void)
+{
+  int size;
+  struct proc *p = myproc();
+
+  argint(0, &size);
+  if(size <= 0)
+    return -1;
+
+  // Redondear al multiplo de pagina
+  size = PGROUNDUP(size);
+
+  // Buscar slot libre
+  int slot = -1;
+  for(int i = 0; i < NVREG; i++){
+    if(!p->vregions[i].used){
+      slot = i;
+      break;
+    }
+  }
+  if(slot < 0)
+    return -1;
+
+  // Proteccion de desbordamiento y limite superior
+  if(p->sz + size < p->sz)
+    return -1;
+  if(p->sz + size > TRAPFRAME)
+    return -1;
+
+  uint64 start = p->sz;
+  p->sz += size;
+
+  p->vregions[slot].start = start;
+  p->vregions[slot].size  = size;
+  p->vregions[slot].used  = 1;
+
+  return start;
+}
+
 uint64
 sys_map_ro(void)
 {

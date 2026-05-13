@@ -46,3 +46,5 @@ entry("uptime");
 entry("trace");
 entry("dumpvm");
 entry("map_ro");
+entry("getpfcount");
+entry("mapzero");
