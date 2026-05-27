@@ -26,3 +26,5 @@
 #define SYS_map_ro 25
 #define SYS_getpfcount 26
 #define SYS_mapzero    27
+#define SYS_mmap       28
+#define SYS_munmap     29

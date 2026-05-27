@@ -88,6 +88,20 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// Número máximo de regiones de memoria mapeada por proceso
+#define MAXVMA 16
+
+// Virtual Memory Area: representa una región de memoria mapeada a un archivo
+struct vma {
+  int      used;    // 1 si esta entrada está en uso, 0 si está libre
+  uint64   addr;    // dirección virtual de inicio de la región
+  uint64   length;  // tamaño de la región en bytes
+  int      prot;    // permisos (PROT_READ, PROT_WRITE, ...)
+  int      flags;   // flags de mmap (MAP_SHARED, MAP_PRIVATE, ...)
+  struct file *file; // archivo respaldando esta región
+  uint64   offset;  // offset dentro del archivo
+};
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -114,4 +128,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct vma vmas[MAXVMA];     // tabla de regiones de memoria mapeada
 };

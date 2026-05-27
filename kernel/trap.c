@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -27,6 +31,56 @@ void
 trapinithart(void)
 {
   w_stvec((uint64)kernelvec);
+}
+
+//
+// mmap_fault: maneja un page fault dentro de una región VMA.
+// Asigna una página física, carga el contenido del archivo y la mapea.
+// Retorna 0 en éxito, -1 si la dirección no pertenece a ninguna VMA.
+static int
+mmap_fault(struct proc *p, uint64 va)
+{
+  // Buscar la VMA que contiene va
+  struct vma *v = 0;
+  for(int i = 0; i < MAXVMA; i++){
+    if(p->vmas[i].used &&
+       va >= p->vmas[i].addr &&
+       va <  p->vmas[i].addr + p->vmas[i].length){
+      v = &p->vmas[i];
+      break;
+    }
+  }
+  if(v == 0)
+    return -1;  // no es una región mapeada
+
+  // Asignar página física y limpiarla
+  char *mem = kalloc();
+  if(mem == 0)
+    return -1;
+  memset(mem, 0, PGSIZE);
+
+  // Calcular offset en el archivo para esta página
+  uint64 page_va  = PGROUNDDOWN(va);
+  uint64 file_off = v->offset + (page_va - v->addr);
+
+  // Leer contenido del archivo en la página física
+  ilock(v->file->ip);
+  readi(v->file->ip, 0, (uint64)mem, file_off, PGSIZE);
+  iunlock(v->file->ip);
+
+  // Construir permisos PTE según prot de la VMA
+  int perm = PTE_U;
+  if(v->prot & PROT_READ)  perm |= PTE_R;
+  if(v->prot & PROT_WRITE) perm |= PTE_W;
+  if(v->prot & PROT_EXEC)  perm |= PTE_X;
+
+  // Mapear la página en la tabla de páginas del proceso
+  if(mappages(p->pagetable, page_va, PGSIZE, (uint64)mem, perm) < 0){
+    kfree(mem);
+    return -1;
+  }
+
+  return 0;
 }
 
 //
@@ -109,6 +163,13 @@ usertrap(void)
         handled = 1;
         printf("lazy page fault handled pid=%d va=%p scause=%ld\n",
                p->pid, (void *)fault_va, r_scause());
+      }
+    }
+
+    // Proyecto 4: mmap page fault — cargar página desde archivo bajo demanda.
+    if(!handled && !killed(p)){
+      if(mmap_fault(p, fault_va) == 0){
+        handled = 1;
       }
     }
 

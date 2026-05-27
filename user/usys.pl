@@ -48,3 +48,5 @@ entry("dumpvm");
 entry("map_ro");
 entry("getpfcount");
 entry("mapzero");
+entry("mmap");
+entry("munmap");

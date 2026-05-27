@@ -53,3 +53,5 @@ void* malloc(uint);
 void free(void*);
 int trace(int mask);
 int map_ro(void *va);
+void* mmap(void *addr, uint64 length, int prot, int flags, int fd, uint64 offset);
+int   munmap(void *addr, uint64 length);
