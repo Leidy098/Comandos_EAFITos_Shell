@@ -219,9 +219,11 @@ sys_munmap(void)
       // Si MAP_SHARED y tiene escritura, volcar cambios al archivo
       if((v->flags & MAP_SHARED) && (v->prot & PROT_WRITE)){
         uint64 file_off = v->offset + (va - v->addr);
+        begin_op();
         ilock(v->file->ip);
         writei(v->file->ip, 1, va, file_off, PGSIZE);
         iunlock(v->file->ip);
+        end_op();
       }
       uvmunmap(p->pagetable, va, 1, 1);  // 1 página, do_free=1
     }

@@ -156,20 +156,21 @@ usertrap(void)
       }
     }
 
-    // Ej.3: lazy allocation normal del heap si no fue una vregion.
+    // Proyecto 4: mmap page fault — tiene prioridad sobre heap lazy
+    // porque mmap extiende p->sz y vmfault lo trataría como heap normal.
+    if(!handled && !killed(p)){
+      if(mmap_fault(p, fault_va) == 0){
+        handled = 1;
+      }
+    }
+
+    // Ej.3: lazy allocation normal del heap si no fue una vregion ni mmap.
     if(!handled && !killed(p)){
       if(vmfault(p->pagetable, fault_va, (r_scause() == 13)? 1 : 0) != 0){
         p->pf_count++;
         handled = 1;
         printf("lazy page fault handled pid=%d va=%p scause=%ld\n",
                p->pid, (void *)fault_va, r_scause());
-      }
-    }
-
-    // Proyecto 4: mmap page fault — cargar página desde archivo bajo demanda.
-    if(!handled && !killed(p)){
-      if(mmap_fault(p, fault_va) == 0){
-        handled = 1;
       }
     }
 

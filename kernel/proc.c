@@ -5,6 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -290,6 +294,14 @@ kfork(void)
   np->pf_count = 0;
   for(int i = 0; i < NVREG; i++)
     np->vregions[i] = p->vregions[i];
+
+  // Copiar VMAs del padre al hijo; incrementar ref-count de cada archivo.
+  memmove(np->vmas, p->vmas, sizeof(p->vmas));
+  for(int i = 0; i < MAXVMA; i++){
+    if(np->vmas[i].used)
+      np->vmas[i].file = filedup(p->vmas[i].file);
+  }
+
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -338,6 +350,31 @@ kexit(int status)
 
   if(p == initproc)
     panic("init exiting");
+
+  // Liberar todas las VMAs activas del proceso.
+  for(int i = 0; i < MAXVMA; i++){
+    struct vma *v = &p->vmas[i];
+    if(!v->used)
+      continue;
+    // Liberar cada página física que haya sido asignada (lazy: puede que no todas).
+    for(uint64 va = v->addr; va < v->addr + v->length; va += PGSIZE){
+      pte_t *pte = walk(p->pagetable, va, 0);
+      if(pte && (*pte & PTE_V)){
+        // Si MAP_SHARED y escribible, volcar cambios al archivo.
+        if((v->flags & MAP_SHARED) && (v->prot & PROT_WRITE)){
+          uint64 file_off = v->offset + (va - v->addr);
+          begin_op();
+          ilock(v->file->ip);
+          writei(v->file->ip, 1, va, file_off, PGSIZE);
+          iunlock(v->file->ip);
+          end_op();
+        }
+        uvmunmap(p->pagetable, va, 1, 1);
+      }
+    }
+    fileclose(v->file);
+    v->used = 0;
+  }
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
