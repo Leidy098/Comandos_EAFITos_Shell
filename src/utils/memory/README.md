@@ -1,66 +1,15 @@
-# Memory Utils — Proyecto 3: Lazy Allocation
+# Memory Utils — Proyecto 4: mmap/munmap con Lazy Allocation
 
-Implementación de Lazy Allocation sobre xv6-riscv (RISC-V, MIT).
+Implementación de memoria mapeada a archivos (`mmap`/`munmap`) en el kernel de xv6. La memoria física **no se asigna al llamar `mmap`** — solo se carga la página exacta cuando el proceso la toca por primera vez (lazy allocation).
+
+---
 
 ## Archivos de esta carpeta
 
 | Archivo | Rol |
 |---------|-----|
-| `memory_syscalls.c` | Implementaciones de syscalls del kernel |
-| `tlazy.c` | Prueba Ej.4: sbrk + accesos + getpfcount |
-| `tmmap_sim.c` | Prueba Ej.5: mapzero, páginas rellenas con `'A'` |
-| `tsbrk2.c` / `tsbrk3.c` | Pruebas Ej.2/3: lazy allocation básica |
-
----
-
-## Ejercicios implementados
-
-### Ej.1 — Observar Page Faults (`kernel/trap.c`)
-Detección de `scause == 13` (load) y `scause == 15` (store) en `usertrap()`.
-Faults inválidos imprimen `page fault: pid=... scause=... stval=...` y matan el proceso.
-Prueba: `tpf` (en `user/tpf.c`).
-
-### Ej.2 — `sbrk()` Lazy (`kernel/sysproc.c`)
-Para `n > 0`: solo incrementa `p->sz`, sin asignar páginas físicas.
-Para `n < 0`: usa `growproc` (comportamiento original).
-
-### Ej.3 — Lazy Allocation real (`kernel/vm.c`, `kernel/trap.c`)
-`vmfault()` asigna la página física cuando el proceso la toca por primera vez.
-- `uvmunmap` y `uvmcopy` toleran PTEs no mapeadas (`continue`).
-- `copyin`, `copyout` y `copyinstr` llaman `vmfault()` si la página no está mapeada.
-- Guard page manejada implícitamente vía `ismapped()`.
-
-### Ej.4 — Contador de page faults (`kernel/proc.h`, `kernel/trap.c`, syscall `getpfcount`)
-- Campo `int pf_count` en `struct proc`; se inicializa a 0 en `allocproc` y en cada hijo de `fork`.
-- `p->pf_count++` solo en faults lazy atendidos exitosamente.
-- Syscall `getpfcount()` (#26) retorna el contador del proceso actual.
-- Prueba: `tlazy`
-
-```
-$ tlazy
-tlazy: inicio, pf_count=0
-tlazy: sbrk(24576) retorno 0x... (lazy, sin paginas fisicas aun)
-tlazy: pf_count tras sbrk=0 (debe ser 0)
-...
-tlazy: pf_count final=6 (esperado 6)
-tlazy: SUCCESS
-```
-
-### Ej.5 — Simulación mmap (`kernel/proc.h`, `kernel/trap.c`, syscall `mapzero`)
-- `struct vregion {start, size, used}` + `vregions[NVREG]` (NVREG=4) en `struct proc`.
-- Syscall `mapzero(size)` (#27): reserva rango virtual sin mapear, registra la vregión.
-- `usertrap()` revisa vregiones **antes** de `vmfault()`; rellena cada página con `0x41` (`'A'`).
-- Prueba: `tmmap_sim`
-
-```
-$ tmmap_sim
-tmmap_sim: mapzero(12288) retorno 0x...
-tmmap_sim: pagina 0 primer byte = 'A' (0x41)
-tmmap_sim: pagina 1 primer byte = 'A' (0x41)
-tmmap_sim: pagina 2 primer byte = 'A' (0x41)
-tmmap_sim: primera pagina completa OK (4096 bytes = 'A')
-tmmap_sim: SUCCESS
-```
+| `tmmapfile.c` | Programa de prueba con 3 casos: lectura, escritura MAP_SHARED y multipágina |
+| `memory_syscalls.c` | Implementaciones de syscalls del kernel (proyectos anteriores) |
 
 ---
 
@@ -68,22 +17,74 @@ tmmap_sim: SUCCESS
 
 | Archivo | Qué se cambió |
 |---------|---------------|
-| `kernel/trap.c` | Manejo de PF: vregion → vmfault → error |
-| `kernel/vm.c` | `vmfault()`, `uvmunmap`, `uvmcopy`, `copyin`, `copyout`, `copyinstr` |
-| `kernel/proc.h` | `struct vregion`, `pf_count`, `vregions[NVREG]` |
-| `kernel/proc.c` | Init en `allocproc` y `kfork` |
-| `kernel/sysproc.c` | `sys_sbrk()` lazy, `sys_getpfcount()` |
-| `kernel/syscall.h` | Números 26 (`getpfcount`) y 27 (`mapzero`) |
-| `kernel/syscall.c` | Externs y entradas en tabla |
-| `kernel/param.h` | `NVREG 4` |
-| `user/user.h` | Declaraciones `getpfcount`, `mapzero` |
-| `user/usys.pl` | Stubs de las nuevas syscalls |
-| `Makefile` | Reglas y UPROGS para `tlazy`, `tmmap_sim` |
-| `src/utils/memory/memory_syscalls.c` | `sys_mapzero()` |
+| `kernel/proc.h` | `struct vma` y `vmas[MAXVMA]` en `struct proc` |
+| `kernel/sysproc.c` | `sys_mmap()` y `sys_munmap()` |
+| `kernel/trap.c` | `mmap_fault()`: atiende page faults de regiones VMA |
+| `kernel/proc.c` | Copia de VMAs en `fork()`, liberación en `exit()` |
+| `kernel/fcntl.h` | Constantes `PROT_READ/WRITE/EXEC`, `MAP_SHARED/PRIVATE` |
+| `kernel/syscall.h` / `syscall.c` | Registra `SYS_mmap` (#28) y `SYS_munmap` (#29) |
+| `user/user.h` / `user/usys.pl` | Declaraciones y stubs para espacio de usuario |
+| `Makefile` | Regla y entrada en UPROGS para `tmmapfile` |
 
 ---
 
-## Compilar y probar
+## Nuevas syscalls
+
+### `mmap(addr, length, prot, flags, fd, offset)`
+
+Mapea un archivo en el espacio de memoria virtual del proceso sin asignar memoria física.
+
+| Parámetro | Descripción |
+|-----------|-------------|
+| `addr` | Dirección sugerida (0 = el kernel elige) |
+| `length` | Tamaño en bytes del mapeo |
+| `prot` | Permisos: `PROT_READ`, `PROT_WRITE`, `PROT_EXEC` |
+| `flags` | `MAP_PRIVATE` (cambios locales) o `MAP_SHARED` (cambios van al archivo) |
+| `fd` | Descriptor del archivo a mapear |
+| `offset` | Byte de inicio dentro del archivo |
+
+Retorna la dirección virtual del inicio del mapeo, o `-1` en error.
+
+### `munmap(addr, length)`
+
+Desmapea una región creada con `mmap`. Si era `MAP_SHARED`, vuelca los cambios al archivo antes de liberar.
+
+Retorna `0` en éxito, `-1` si la dirección no corresponde a ninguna VMA.
+
+---
+
+## Cómo funciona paso a paso
+
+```
+1. mmap(fd, 4096, PROT_READ, MAP_PRIVATE, fd, 0)
+   ├── Valida parámetros (length > 0, fd válido)
+   ├── Busca ranura libre en vmas[]
+   ├── Reserva espacio virtual (p->sz += 4096)
+   ├── Registra la VMA (used, addr, length, prot, file, offset)
+   └── Retorna dirección virtual  ← NO hay RAM asignada
+
+2. char c = addr[0]  ← proceso accede por primera vez
+   └── PAGE FAULT (scause=13 lectura / scause=15 escritura)
+       └── usertrap() → mmap_fault():
+             ├── Busca la VMA que contiene la dirección
+             ├── kalloc()   → asigna página física (4096 bytes)
+             ├── readi()    → carga datos del archivo en esa página
+             ├── mappages() → conecta dirección virtual ↔ física
+             └── p->pf_count++
+
+3. munmap(addr, 4096)
+   ├── Busca la VMA correspondiente
+   ├── Si MAP_SHARED + PROT_WRITE: writei() → vuelca cambios al disco
+   ├── uvmunmap() → libera la página física
+   ├── fileclose() → decrementa ref-count del archivo
+   └── v->used = 0 → ranura VMA libre
+```
+
+---
+
+## Programa de prueba: `tmmapfile`
+
+Compilar y arrancar xv6:
 
 ```bash
 make qemu
@@ -92,9 +93,53 @@ make qemu
 Dentro de xv6:
 
 ```sh
-tpf        # Ej.1: page faults inválidos
-tsbrk2     # Ej.2/3: lazy sbrk
-tsbrk3     # Ej.3: lazy con múltiples páginas
-tlazy      # Ej.4: getpfcount
-tmmap_sim  # Ej.5: mapzero con patrón 'A'
+tmmapfile
 ```
+
+### Caso 1 — Lectura (`PROT_READ`, `MAP_PRIVATE`)
+
+Crea `mmap_test.txt` con `"Hola mmap xv6!"`, lo mapea y verifica que el page fault carga el contenido correctamente.
+
+```
+[Caso 1] Lectura desde archivo mapeado
+  mmap retorno 0x....  (sin memoria fisica aun)
+  primer byte leido: 'H' (page fault resuelto OK)
+  contenido correcto: "Hola mmap xv6!"
+  munmap OK
+```
+
+### Caso 2 — Escritura (`PROT_READ|PROT_WRITE`, `MAP_SHARED`)
+
+Mapea `mmap_rw.txt` en modo compartido, modifica los primeros bytes y verifica que el archivo en disco quedó actualizado tras `munmap`.
+
+```
+[Caso 2] Escritura en memoria mapeada (MAP_SHARED)
+  byte inicial: 'A'
+  escritura OK: addr[0]='Z' addr[1]='X'
+  munmap OK (cambios volcados al archivo)
+  archivo actualizado correctamente: 'ZX'
+```
+
+### Caso 3 — Múltiples páginas (lazy por demanda)
+
+Crea un archivo de 3 páginas (12 KB) y accede a cada una por separado, demostrando que cada acceso genera su propio page fault.
+
+```
+[Caso 3] Acceso multipagina (lazy por demanda)
+  pagina 0: primer byte = 'X' (page fault #1 resuelto)
+  pagina 1: primer byte = 'X' (page fault #2 resuelto)
+  pagina 2: primer byte = 'X' (page fault #3 resuelto)
+  munmap multipagina OK
+
+=== tmmapfile: SUCCESS ===
+```
+
+---
+
+## Decisiones de diseño
+
+- **Sin `kalloc()` en `mmap`:** La RAM se asigna únicamente cuando el proceso accede a la página. Si nunca accede, nunca se gasta memoria física.
+- **`filedup` al crear la VMA:** El archivo no se cierra mientras exista el mapeo, aunque el proceso cierre el descriptor `fd` original.
+- **`fork` copia VMAs + `filedup`:** El hijo hereda todos los mapeos con referencias independientes al archivo. Ambos pueden hacer `munmap` o terminar sin invalidar al otro.
+- **`exit` libera todas las VMAs:** Se recorren todas las entradas activas, se vuelcan cambios `MAP_SHARED` y se liberan páginas para evitar memory leaks.
+- **`mmap_fault` tiene prioridad sobre el heap lazy:** En `usertrap()`, el handler de mmap se invoca antes que `vmfault()` porque `mmap` extiende `p->sz` y el handler de heap lo confundiría con memoria anónima.

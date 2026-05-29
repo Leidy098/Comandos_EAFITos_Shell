@@ -80,6 +80,7 @@ mmap_fault(struct proc *p, uint64 va)
     return -1;
   }
 
+  p->pf_count++;
   return 0;
 }
 
